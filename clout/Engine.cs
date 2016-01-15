@@ -46,8 +46,8 @@ namespace Clout
         /// <returns>Whether it succeeded and the results</returns>
         public CommandResult Clout()
         {
-            var results = new ConcurrentDictionary<string, int>();
-            IEnumerable<string> people = DataAccess.GetAllPeople();
+            var results = new ConcurrentDictionary<Person, int>();
+            IEnumerable<Person> people = DataAccess.GetAllPeople();
 
             Parallel.ForEach(
                 people,
@@ -62,7 +62,7 @@ namespace Clout
                     Environment.NewLine,
                     results
                         .OrderByDescending(c => c.Value)
-                        .Select(c => this.FormatCloutMessage(c.Key, c.Value))));
+                        .Select(c => this.FormatCloutMessage(c.Key.Name, c.Value))));
         }
 
         /// <summary>
@@ -73,7 +73,11 @@ namespace Clout
         /// <returns>Whether it succeeded and the results</returns>
         public CommandResult Clout(string name)
         {
-            int clout = GetClout(name);
+            var leader = DataAccess.GetPerson(name);
+            if (leader == null) 
+                return new CommandResult(false, string.Format("Person <{0}> doesn't exist", name));
+
+            int clout = GetClout(leader);
             var message = this.FormatCloutMessage(name, clout);
 
             return new CommandResult(true, message);
@@ -86,7 +90,7 @@ namespace Clout
         /// Gets the clout of person
         /// This is a recursive function which traverses the tree up to it's roots
         /// </summary>
-        /// <param name="current">The current person's name for which clout is being calculated</param>
+        /// <param name="leader">The current person's name for which clout is being calculated</param>
         /// <param name="processed">
         /// A list containing the persons for which clout has been processed
         /// This is needed in order to escape loops in the graph
@@ -94,15 +98,12 @@ namespace Clout
         /// By keeping track of which nodes we already processed we avoid the loop and potential double processing
         /// </param>
         /// <returns>The number of followers for the users</returns>
-        private static int GetClout(string current, ConcurrentBag<string> processed = null)
+        private static int GetClout(Person leader, ConcurrentBag<Person> processed = null)
         {
-            if (processed == null) processed = new ConcurrentBag<string>(); // Not created yet? Create it
-            if (processed.Contains(current)) return 0; // Already processed? break the recursion without affecting the calculation
+            if (processed == null) processed = new ConcurrentBag<Person>(); // Not created yet? Create it
+            if (processed.Contains(leader)) return 0; // Already processed? break the recursion without affecting the calculation
 
-            processed.Add(current);
-
-            var leader = DataAccess.GetPerson(current);
-            if (leader == null) throw new Exception(string.Format("Person {0} doesn't exist", current));
+            processed.Add(leader);
 
             var followers = DataAccess.GetFollowers(leader);
 

@@ -47,22 +47,22 @@ namespace Clout
             }
         }
 
-        public static IEnumerable<string> GetAllPeople()
+        public static IEnumerable<Person> GetAllPeople()
         {
             using (var db = new CloutContext())
             {
-                return (from person in db.Person select person.Name).ToList();
+                return (from person in db.Person select person).ToList();
             }
         }
 
-        public static IEnumerable<string> GetFollowers(Person leader)
+        public static IEnumerable<Person> GetFollowers(Person leader)
         {
             using (var db = new CloutContext())
             {
                 return (from follower in db.Following
                         join person in db.Person on follower.PersonId equals person.Id
                         where follower.FollowingId == leader.Id
-                        select person.Name).ToList();
+                        select person).ToList();
             }
         }
     }
