@@ -1,19 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="Program.cs" company="None">
+//   None
+// </copyright>
+// <summary>
+//   Defines the Program type.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
+
+using System;
 
 namespace Clout
 {
-    class Program
+    public class Program
     {
         private const string ReadPrompt = "> ";
         private const string Exit = "exit";
 
         static void Main(string[] args)
         {
-            var control = new Controller();
+            var interpreter = new CommandInterpreter();
 
             while (true)
             {
@@ -23,20 +28,18 @@ namespace Clout
 
                 try
                 {
-                    var result = control.InterpretCommand(consoleInput);
+                    var result = interpreter.ExecuteCommand(consoleInput);
                     WriteToConsole(result.Content);
                 }
                 catch (Exception ex)
                 {
-                    // OOPS! Something went wrong - Write out the problem:
-                    WriteToConsole(ex.Message);
+                    WriteToConsole(ex.ToString());
                 }
             }
         }
 
         private static string ReadFromConsole(string promptMessage = "")
         {
-            // Show a prompt, and get input:
             Console.Write(ReadPrompt + promptMessage);
             return Console.ReadLine();
         }

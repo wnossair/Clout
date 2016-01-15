@@ -64,8 +64,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Command.cs" />
+    <Compile Include="CommandResult.cs" />
+    <Compile Include="DataAccess.cs" />
     <Compile Include="Engine.cs" />
-    <Compile Include="Controller.cs" />
+    <Compile Include="CommandInterpreter.cs" />
     <Compile Include="Following.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>

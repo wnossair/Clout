@@ -1,107 +1,123 @@
 ﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="Engine.cs" company="None">
+//   None
+// </copyright>
 // <summary>
 //   Defines the Engine type.
 // </summary>
 // --------------------------------------------------------------------------------------------------------------------
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data.Entity.Migrations;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Clout
 {
-    using System.Collections.Concurrent;
-    using System.Data.Entity.Migrations;
-
     public class Engine : IEngine
     {
-        public CommandResult AddLink(string followerName, string leaderName)
+        public const string FollowsSuccessMessage = "OK!";
+
+        #region IEngine
+        /// <summary>
+        /// Adds a link between a follower and a leader
+        /// A follower can only follow at most one person
+        /// Responds to the command: [follower name] follows [leader name]
+        /// </summary>
+        /// <param name="followerName">The follower's name</param>
+        /// <param name="leaderName">The leader's name</param>
+        /// <returns>Whether it succeeded and the message to display</returns>
+        public CommandResult Link(string followerName, string leaderName)
         {
-            const string SuccessMessage = "OK!";
-            try
-            {
-                using (var db = new CloutContext())
-                {
-                    var follower = GetOrAddPerson(followerName, db);
-                    var leader = GetOrAddPerson(leaderName, db);
+            var follower = DataAccess.GetOrAddPerson(followerName);
+            var leader = DataAccess.GetOrAddPerson(leaderName);
 
-                    db.Following.AddOrUpdate(new Following { PersonId = follower.Id, FollowingId = leader.Id });
-                    db.SaveChanges();
-                }
+            DataAccess.AddOrUpdateLink(follower, leader);
 
-                return new CommandResult(true, SuccessMessage);
-            }
-            catch (Exception e)
-            {
-                return new CommandResult(false, e.ToString());
-            }
+            return new CommandResult(true, FollowsSuccessMessage);
         }
 
-        private static Person GetOrAddPerson(string name, CloutContext db)
-        {
-            var person = db.Person.SingleOrDefault(p => p.Name == name);
-            if (person == null)
-                db.Person.Add(new Person { Name = name });
-
-            db.SaveChanges();
-            return person ?? db.Person.SingleOrDefault(p => p.Name == name);
-        }
-
-        private static bool PersonExists(string name, CloutContext db)
-        {
-            return db.Person.SingleOrDefault(p => p.Name == name) == null;
-        }
-        
-        public int GetClout(string current, List<string> done = null)
-        {
-            if (done == null) done = new List<string>();
-            if (done.Contains(current)) return 0;
-
-            done.Add(current);
-
-            using (var db = new CloutContext())
-            {
-                var leader = db.Person.SingleOrDefault(p => p.Name == current);
-                var followers = (from follower in db.Following
-                                 join person in db.Person on follower.PersonId equals person.Id
-                                 where follower.FollowingId == leader.Id
-                                 select person.Name).ToList();
-
-                return followers.Sum(follower => 1 + this.GetClout(follower, done));
-            }
-        }
-
-        public CommandResult Calculate()
+        /// <summary>
+        /// Calculates the clout for all users in the database
+        /// Responds to the command: clout
+        /// </summary>
+        /// <returns>Whether it succeeded and the results</returns>
+        public CommandResult Clout()
         {
             var results = new ConcurrentDictionary<string, int>();
-            using (var db = new CloutContext())
-            {
-                IEnumerable<string> people = from person in db.Person select person.Name;
-                Parallel.ForEach(people, 
-                    person => results.AddOrUpdate(
-                        person,
-                        this.GetClout(person), 
-                        (key, oldValue) => oldValue));
-            }
+            IEnumerable<string> people = DataAccess.GetAllPeople();
+
+            Parallel.ForEach(
+                people,
+                person => results.AddOrUpdate(
+                    person,
+                    GetClout(person),
+                    (key, oldValue) => oldValue));
 
             return new CommandResult(
                 true,
                 string.Join(
-                    Environment.NewLine, 
-                    results.OrderByDescending(c => c.Value).Select(c => GetMessage(c.Key, c.Value))));
+                    Environment.NewLine,
+                    results
+                        .OrderByDescending(c => c.Value)
+                        .Select(c => this.FormatCloutMessage(c.Key, c.Value))));
         }
 
-        public CommandResult Calculate(string name)
+        /// <summary>
+        /// Calculates the clout for one user in the database
+        /// Responds to the command: clout [person name]
+        /// </summary>
+        /// <param name="name">The person's name</param>
+        /// <returns>Whether it succeeded and the results</returns>
+        public CommandResult Clout(string name)
         {
-            int clout = this.GetClout(name);
-            var message = GetMessage(name, clout);
+            int clout = GetClout(name);
+            var message = this.FormatCloutMessage(name, clout);
 
             return new CommandResult(true, message);
         }
 
-        private static string GetMessage(string name, int clout)
+        #endregion
+
+        #region Private Methods
+        /// <summary>
+        /// Gets the clout of person
+        /// This is a recursive function which traverses the tree up to it's roots
+        /// </summary>
+        /// <param name="current">The current person's name for which clout is being calculated</param>
+        /// <param name="processed">
+        /// A list containing the persons for which clout has been processed
+        /// This is needed in order to escape loops in the graph
+        /// Example: A follows B, B follows A - the recursion will continue infinitely. 
+        /// By keeping track of which nodes we already processed we avoid the loop and potential double processing
+        /// </param>
+        /// <returns>The number of followers for the users</returns>
+        private static int GetClout(string current, ConcurrentBag<string> processed = null)
+        {
+            if (processed == null) processed = new ConcurrentBag<string>(); // Not created yet? Create it
+            if (processed.Contains(current)) return 0; // Already processed? break the recursion without affecting the calculation
+
+            processed.Add(current);
+
+            var leader = DataAccess.GetPerson(current);
+            if (leader == null) throw new Exception(string.Format("Person {0} doesn't exist", current));
+
+            var followers = DataAccess.GetFollowers(leader);
+
+            // For each follower return the sum of 1 (for the node) and the clout of thier followers
+            return followers.Sum(follower => 1 + GetClout(follower, processed));
+        }
+
+
+        /// <summary>
+        /// Format the clout message
+        /// </summary>
+        /// <param name="name">Name of person</param>
+        /// <param name="clout">Clout of person</param>
+        /// <returns>Formatted string</returns>
+        private string FormatCloutMessage(string name, int clout)
         {
             string message;
             switch (clout)
@@ -119,5 +135,7 @@ namespace Clout
 
             return message;
         }
+        
+        #endregion
     }
 }
