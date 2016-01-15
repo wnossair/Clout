@@ -1,25 +1,20 @@
-﻿using System;
+﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="DataAccess.cs" company="None">
+//   None
+// </copyright>
+// <summary>
+//   Defines the DataAccess type.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
+
 using System.Collections.Generic;
+using System.Data.Entity.Migrations;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Clout
 {
-    using System.Data.Entity.Migrations;
-
     public static class DataAccess
     {
-        /// <summary>
-        /// Gets a person by name using the context of the database passed
-        /// If the person is not in the database, it adds it first
-        /// </summary>
-        /// <param name="name">
-        /// The name of the person
-        /// </param>
-        /// <returns>
-        /// The Person from the database
-        /// </returns>
         public static Person GetOrAddPerson(string name)
         {
             using (var db = new CloutContext())
