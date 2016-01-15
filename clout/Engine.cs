@@ -10,7 +10,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data.Entity.Migrations;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -19,6 +18,7 @@ namespace Clout
     public class Engine : IEngine
     {
         public const string FollowsSuccessMessage = "OK!";
+        public const string FollowsSamePersonMessage = "Interesting, but that doesn't make sense.";
 
         #region IEngine
         /// <summary>
@@ -31,6 +31,9 @@ namespace Clout
         /// <returns>Whether it succeeded and the message to display</returns>
         public CommandResult Link(string followerName, string leaderName)
         {
+            if (followerName == leaderName)
+                return new CommandResult(true, FollowsSamePersonMessage);
+
             var follower = DataAccess.GetOrAddPerson(followerName);
             var leader = DataAccess.GetOrAddPerson(leaderName);
 
@@ -110,7 +113,6 @@ namespace Clout
             // For each follower return the sum of 1 (for the node) and the clout of thier followers
             return followers.Sum(follower => 1 + GetClout(follower, processed));
         }
-
 
         /// <summary>
         /// Format the clout message
